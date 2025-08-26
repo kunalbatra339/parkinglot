@@ -9,97 +9,29 @@
 #include <sstream>
 
 // --- Structs for data management ---
-
-// Enum for vehicle types
 enum VehicleType {
     MOTORCYCLE,
     CAR
 };
 
-// Structure to hold vehicle information
 struct Vehicle {
     std::string licensePlate;
     std::string ownerName;
-    VehicleType type; // New field for vehicle type
+    VehicleType type;
 };
 
-// Structure to represent a single parking slot
 struct ParkingSlot {
     int slotNumber;
     bool isOccupied;
     Vehicle vehicle;
-    // We use a long long to save entry time in a file
     long long entryTimeEpoch; 
 };
 
-// --- Function Prototypes ---
-void displayMenu();
-void displayAdminMenu();
-void clearInputBuffer();
-
-// Main functionality
-void saveRecords(const std::vector<ParkingSlot>& parkingLot);
-void loadRecords(std::vector<ParkingSlot>& parkingLot);
-void parkVehicle(std::vector<ParkingSlot>& parkingLot);
-void unparkVehicle(std::vector<ParkingSlot>& parkingLot);
-void findVehicle(const std::vector<ParkingSlot>& parkingLot);
-void displayAvailableSlots(const std::vector<ParkingSlot>& parkingLot);
-void displayAllSlots(const std::vector<ParkingSlot>& parkingLot);
-void calculateAndDisplayFee(const ParkingSlot& slot); // Moved to a separate function
-
-// Admin functions
-void adminLogin(std::vector<ParkingSlot>& parkingLot);
-void addSlot(std::vector<ParkingSlot>& parkingLot);
-void removeSlot(std::vector<ParkingSlot>& parkingLot);
-
-// --- Main function ---
-int main() {
-    std::vector<ParkingSlot> parkingLot;
-    
-    // Attempt to load existing parking data from file
-    loadRecords(parkingLot);
-
-    // If no data was loaded, initialize the parking lot with 10 slots
-    if (parkingLot.empty()) {
-        for (int i = 1; i <= 10; ++i) {
-            parkingLot.push_back({i, false, {"", "", MOTORCYCLE}, 0});
-        }
-    }
-
-    int choice;
-    do {
-        displayMenu();
-        std::cout << "Enter your choice: ";
-        std::cin >> choice;
-        clearInputBuffer();
-
-        switch (choice) {
-            case 1: parkVehicle(parkingLot); break;
-            case 2: unparkVehicle(parkingLot); break;
-            case 3: findVehicle(parkingLot); break;
-            case 4: displayAvailableSlots(parkingLot); break;
-            case 5: displayAllSlots(parkingLot); break;
-            case 6: adminLogin(parkingLot); break;
-            case 7: 
-                std::cout << "Saving records and exiting. Goodbye!" << std::endl;
-                // Save records on exit to ensure the latest data is stored
-                saveRecords(parkingLot); 
-                break;
-            default: std::cout << "Invalid choice. Please try again." << std::endl; break;
-        }
-    } while (choice != 7);
-
-    return 0;
-}
-
 // --- Function Definitions ---
-
-// Clears the input buffer to prevent issues with std::cin
 void clearInputBuffer() {
     std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
 }
 
-// Saves parking records to a text file
 void saveRecords(const std::vector<ParkingSlot>& parkingLot) {
     std::ofstream outFile("parking_records.txt");
     if (!outFile.is_open()) {
@@ -117,7 +49,6 @@ void saveRecords(const std::vector<ParkingSlot>& parkingLot) {
     outFile.close();
 }
 
-// Loads parking records from a text file
 void loadRecords(std::vector<ParkingSlot>& parkingLot) {
     std::ifstream inFile("parking_records.txt");
     if (!inFile.is_open()) {
@@ -125,7 +56,7 @@ void loadRecords(std::vector<ParkingSlot>& parkingLot) {
         return;
     }
 
-    parkingLot.clear(); // Clear existing data to load from file
+    parkingLot.clear();
     std::string line;
     while (std::getline(inFile, line)) {
         std::stringstream ss(line);
@@ -135,7 +66,6 @@ void loadRecords(std::vector<ParkingSlot>& parkingLot) {
         std::string license, owner;
         long long entryTime;
 
-        // Read parts separated by '|'
         std::getline(ss, part, '|');
         slotNum = std::stoi(part);
         
@@ -161,7 +91,6 @@ void loadRecords(std::vector<ParkingSlot>& parkingLot) {
     std::cout << "Parking records loaded successfully." << std::endl;
 }
 
-// Displays the main menu
 void displayMenu() {
     std::cout << "\n======================================" << std::endl;
     std::cout << "      PARKING LOT MANAGEMENT SYSTEM" << std::endl;
@@ -176,7 +105,6 @@ void displayMenu() {
     std::cout << "======================================" << std::endl;
 }
 
-// Displays the admin menu
 void displayAdminMenu() {
     std::cout << "\n======================================" << std::endl;
     std::cout << "           ADMIN PANEL" << std::endl;
@@ -187,20 +115,50 @@ void displayAdminMenu() {
     std::cout << "======================================" << std::endl;
 }
 
-// Parks a vehicle in an available slot
+void calculateAndDisplayFee(const ParkingSlot& slot) {
+    auto now = std::chrono::system_clock::now();
+    auto entryTime = std::chrono::system_clock::from_time_t(slot.entryTimeEpoch);
+    std::chrono::duration<double> duration = now - entryTime;
+    int minutes = std::chrono::duration_cast<std::chrono::minutes>(duration).count();
+    
+    double baseRate = 1.0; 
+    if (slot.vehicle.type == CAR) {
+        baseRate = 2.0;
+    }
+
+    double fee = (static_cast<double>(minutes) / 15.0) * baseRate;
+    
+    std::cout << "\n--- Parking Fee Details ---" << std::endl;
+    std::cout << "Duration: " << minutes << " minutes" << std::endl;
+    std::cout << "Total Fee: Rs." << std::fixed << std::setprecision(2) << fee << std::endl;
+    std::cout << "--------------------------" << std::endl;
+}
+
+void displayAvailableSlots(const std::vector<ParkingSlot>& parkingLot) {
+    std::cout << "\n--- Available Parking Slots ---" << std::endl;
+    bool found = false;
+    for (const auto& slot : parkingLot) {
+        if (!slot.isOccupied) {
+            std::cout << "Slot " << slot.slotNumber << std::endl;
+            found = true;
+        }
+    }
+    if (!found) {
+        std::cout << "Sorry, no slots are currently available." << std::endl;
+    }
+}
+
 void parkVehicle(std::vector<ParkingSlot>& parkingLot) {
     int slotChoice;
     std::string license, owner;
     char vehicleTypeChar;
 
-    // Display available slots before prompting for choice
     displayAvailableSlots(parkingLot); 
 
     std::cout << "\nEnter the slot number to park in: ";
     std::cin >> slotChoice;
     clearInputBuffer();
 
-    // Find the chosen slot
     auto it = std::find_if(parkingLot.begin(), parkingLot.end(), 
         [slotChoice](const ParkingSlot& slot){ return slot.slotNumber == slotChoice && !slot.isOccupied; });
 
@@ -227,18 +185,16 @@ void parkVehicle(std::vector<ParkingSlot>& parkingLot) {
         it->vehicle = {license, owner, type};
         it->isOccupied = true;
         
-        // Get current time and convert to a long long to save
         it->entryTimeEpoch = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
 
         std::cout << "\nParking Confirmed!" << std::endl;
         std::cout << "Vehicle: " << it->vehicle.licensePlate << " parked in slot " << it->slotNumber << "." << std::endl;
-        saveRecords(parkingLot); // Save state immediately
+        saveRecords(parkingLot);
     } else {
         std::cout << "Invalid slot number or slot is already occupied. Please try again." << std::endl;
     }
 }
 
-// Unparks a vehicle and calculates the fee
 void unparkVehicle(std::vector<ParkingSlot>& parkingLot) {
     std::string license;
     std::cout << "\nEnter the license plate of the vehicle to unpark: ";
@@ -250,19 +206,17 @@ void unparkVehicle(std::vector<ParkingSlot>& parkingLot) {
             
             calculateAndDisplayFee(slot);
             
-            // Reset the slot
             slot.isOccupied = false;
             slot.vehicle = {"", "", MOTORCYCLE};
             slot.entryTimeEpoch = 0;
             std::cout << "Vehicle " << license << " has been unparked from slot " << slot.slotNumber << "." << std::endl;
-            saveRecords(parkingLot); // Save state immediately
+            saveRecords(parkingLot);
             return;
         }
     }
     std::cout << "Vehicle with license plate " << license << " not found." << std::endl;
 }
 
-// Finds a vehicle by license plate
 void findVehicle(const std::vector<ParkingSlot>& parkingLot) {
     std::string license;
     std::cout << "\nEnter the license plate to search for: ";
@@ -280,22 +234,6 @@ void findVehicle(const std::vector<ParkingSlot>& parkingLot) {
     std::cout << "Vehicle with license plate " << license << " not found." << std::endl;
 }
 
-// Displays available slots
-void displayAvailableSlots(const std::vector<ParkingSlot>& parkingLot) {
-    std::cout << "\n--- Available Parking Slots ---" << std::endl;
-    bool found = false;
-    for (const auto& slot : parkingLot) {
-        if (!slot.isOccupied) {
-            std::cout << "Slot " << slot.slotNumber << std::endl;
-            found = true;
-        }
-    }
-    if (!found) {
-        std::cout << "Sorry, no slots are currently available." << std::endl;
-    }
-}
-
-// Displays all slots, both occupied and available
 void displayAllSlots(const std::vector<ParkingSlot>& parkingLot) {
     std::cout << "\n--- All Parking Slots ---" << std::endl;
     std::cout << std::left << std::setw(10) << "Slot No."
@@ -322,32 +260,6 @@ void displayAllSlots(const std::vector<ParkingSlot>& parkingLot) {
     }
 }
 
-// Admin login for security
-void adminLogin(std::vector<ParkingSlot>& parkingLot) {
-    std::string password;
-    std::cout << "\nEnter admin password: ";
-    std::getline(std::cin, password);
-
-    if (password == "admin123") { // Hardcoded for simplicity
-        int adminChoice;
-        do {
-            displayAdminMenu();
-            std::cout << "Enter your choice: ";
-            std::cin >> adminChoice;
-            clearInputBuffer();
-            switch (adminChoice) {
-                case 1: addSlot(parkingLot); break;
-                case 2: removeSlot(parkingLot); break;
-                case 3: std::cout << "Returning to main menu." << std::endl; break;
-                default: std::cout << "Invalid choice. Please try again." << std::endl; break;
-            }
-        } while (adminChoice != 3);
-    } else {
-        std::cout << "Incorrect password. Access denied." << std::endl;
-    }
-}
-
-// Adds a new parking slot
 void addSlot(std::vector<ParkingSlot>& parkingLot) {
     int newSlotNumber;
     std::cout << "Enter the number for the new slot: ";
@@ -365,7 +277,6 @@ void addSlot(std::vector<ParkingSlot>& parkingLot) {
     saveRecords(parkingLot);
 }
 
-// Removes an existing parking slot
 void removeSlot(std::vector<ParkingSlot>& parkingLot) {
     int slotToRemove;
     std::cout << "Enter the slot number to remove: ";
@@ -388,23 +299,63 @@ void removeSlot(std::vector<ParkingSlot>& parkingLot) {
     }
 }
 
-// Calculates and displays parking fee based on vehicle type
-void calculateAndDisplayFee(const ParkingSlot& slot) {
-    auto now = std::chrono::system_clock::now();
-    auto entryTime = std::chrono::system_clock::from_time_t(slot.entryTimeEpoch);
-    std::chrono::duration<double> duration = now - entryTime;
-    int minutes = std::chrono::duration_cast<std::chrono::minutes>(duration).count();
+void adminLogin(std::vector<ParkingSlot>& parkingLot) {
+    std::string password;
+    std::cout << "\nEnter admin password: ";
+    std::getline(std::cin, password);
+
+    if (password == "admin123") {
+        int adminChoice;
+        do {
+            displayAdminMenu();
+            std::cout << "Enter your choice: ";
+            std::cin >> adminChoice;
+            clearInputBuffer();
+            switch (adminChoice) {
+                case 1: addSlot(parkingLot); break;
+                case 2: removeSlot(parkingLot); break;
+                case 3: std::cout << "Returning to main menu." << std::endl; break;
+                default: std::cout << "Invalid choice. Please try again." << std::endl; break;
+            }
+        } while (adminChoice != 3);
+    } else {
+        std::cout << "Incorrect password. Access denied." << std::endl;
+    }
+}
+
+// --- Main function ---
+int main() {
+    std::vector<ParkingSlot> parkingLot;
     
-    // Base rate for a motorcycle (e.g., Rs. 1 for every 15 minutes)
-    double baseRate = 1.0; 
-    if (slot.vehicle.type == CAR) {
-        baseRate = 2.0; // Car rate is double the base rate
+    loadRecords(parkingLot);
+
+    if (parkingLot.empty()) {
+        for (int i = 1; i <= 10; ++i) {
+            parkingLot.push_back({i, false, {"", "", MOTORCYCLE}, 0});
+        }
     }
 
-    double fee = (static_cast<double>(minutes) / 15.0) * baseRate;
-    
-    std::cout << "\n--- Parking Fee Details ---" << std::endl;
-    std::cout << "Duration: " << minutes << " minutes" << std::endl;
-    std::cout << "Total Fee: Rs." << std::fixed << std::setprecision(2) << fee << std::endl;
-    std::cout << "--------------------------" << std::endl;
+    int choice;
+    do {
+        displayMenu();
+        std::cout << "Enter your choice: ";
+        std::cin >> choice;
+        clearInputBuffer();
+
+        switch (choice) {
+            case 1: parkVehicle(parkingLot); break;
+            case 2: unparkVehicle(parkingLot); break;
+            case 3: findVehicle(parkingLot); break;
+            case 4: displayAvailableSlots(parkingLot); break;
+            case 5: displayAllSlots(parkingLot); break;
+            case 6: adminLogin(parkingLot); break;
+            case 7: 
+                std::cout << "Saving records and exiting. Goodbye!" << std::endl;
+                saveRecords(parkingLot); 
+                break;
+            default: std::cout << "Invalid choice. Please try again." << std::endl; break;
+        }
+    } while (choice != 7);
+
+    return 0;
 }
